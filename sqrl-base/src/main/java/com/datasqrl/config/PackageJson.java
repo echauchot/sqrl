@@ -86,6 +86,8 @@ public interface PackageJson {
   interface EnginesConfig {
 
     Optional<EngineConfig> getEngineConfig(String engineId);
+
+    EngineConfig getEngineConfigOrErr(String engineId);
   }
 
   interface EngineConfig {
