@@ -22,7 +22,8 @@ public class CompilerConfigImpl implements PackageJson.CompilerConfig {
   }
   public boolean isExtendedScalarTypes() {
     return sqrlConfig.asBool("extendedScalarTypes")
-            .getOptional().orElse(false); // by default don't use the extended scalar types (map PK as float) for backward compatibility
+// TODO put back to false. It just for testing with extendedScalarTypes enabled (DAGPlannerTest uses default package.json which disables it)
+            .getOptional().orElse(true); // by default don't use the extended scalar types (map PK as float) for backward compatibility
   }
 
   @Override
