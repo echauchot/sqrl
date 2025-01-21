@@ -30,6 +30,10 @@ import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Purpose: Configures data fetchers for GraphQL subscriptions.
+ * Collaboration: Uses {@link RootGraphqlModel} to get subscription coordinates and creates data fetchers for Kafka and PostgreSQL.
+ */
 @Slf4j
 @AllArgsConstructor
 public class SubscriptionConfigurationImpl implements SubscriptionConfiguration<DataFetcher<?>> {

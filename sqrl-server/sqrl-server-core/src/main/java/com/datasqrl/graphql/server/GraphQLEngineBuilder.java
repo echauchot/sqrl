@@ -52,12 +52,17 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-public class GraphQLEngineBuilder implements
-    RootVisitor<GraphQL.Builder, Context>,
-    CoordVisitor<DataFetcher<?>, Context>,
-    SchemaVisitor<TypeDefinitionRegistry, Object>,
-    QueryBaseVisitor<ResolvedQuery, Context>,
-    ResolvedQueryVisitor<CompletableFuture, QueryExecutionContext> {
+/**
+ * Purpose: Builds the GraphQL engine by wiring together the schema, resolvers, and custom scalars.
+ * Walks the GraphQL schema to prepare the GraphQL engine for executing the requests (create prepared statements for supported Databases)
+ * Collaboration: Uses {@link RootGraphqlModel} to get the schema and coordinates, and Context to create data fetchers.
+ */
+public class GraphQLEngineBuilder
+    implements RootVisitor<GraphQL.Builder, Context>,
+        CoordVisitor<DataFetcher<?>, Context>,
+        SchemaVisitor<TypeDefinitionRegistry, Object>,
+        QueryBaseVisitor<ResolvedQuery, Context>,
+        ResolvedQueryVisitor<CompletableFuture, QueryExecutionContext> {
 
   private final List<GraphQLScalarType> addlTypes;
   private final SubscriptionConfiguration<DataFetcher<?>> subscriptionConfiguration;

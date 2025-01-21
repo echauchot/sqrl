@@ -39,6 +39,10 @@ import lombok.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Purpose: Implements Context for Vert.x, providing SQL clients and data fetchers.
+ * Collaboration: Uses {@link VertxJdbcClient} for database operations and {@link NameCanonicalizer} for name handling.
+ */
 @Value
 public class VertxContext implements Context {
 

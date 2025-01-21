@@ -21,12 +21,18 @@ import lombok.Setter;
 import lombok.Singular;
 import lombok.ToString;
 
+/**
+ * Purpose: Encapsulates the GraphQL schema and entry points (queries, mutations, subscriptions).
+ * This class is deserialized from vertx.json
+ * Collaboration: Provides visitors to process entry points and schema definitions.
+ *
+ */
 @Getter
 @Builder
 public class RootGraphqlModel {
 
   @Singular
-  List<Coords> coords;
+  List<Coords> coords; // coordinates of the graphQL queries
   @Singular
   List<MutationCoords> mutations;
   @Singular
