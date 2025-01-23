@@ -15,6 +15,7 @@ import com.datasqrl.graphql.server.RootGraphqlModel.ResolvedJdbcQuery;
 import com.datasqrl.graphql.server.RootGraphqlModel.ResolvedPagedJdbcQuery;
 import com.datasqrl.graphql.server.RootGraphqlModel.SourceParameter;
 import graphql.schema.DataFetchingEnvironment;
+import io.micrometer.core.instrument.Counter;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
@@ -33,8 +34,8 @@ import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Class responsible for executing the resolved SQL queries (paginated or not) in Vert.x and mapping the database resultSet to json for using in GraphQL responses.
- * It also implements the parameters and arguments visitors for the {@link com.datasqrl.graphql.server.RootGraphqlModel}
+ * Responsible for executing the resolved SQL queries (paginated or not) in Vert.x and mapping the database resultSet to json for using in GraphQL responses.
+ * It also implements the parameters and arguments visitors for the {@link com.datasqrl.graphql.server.RootGraphqlModel} visitors
  */
 @Value
 public class VertxQueryExecutionContext implements QueryExecutionContext,
@@ -42,7 +43,8 @@ public class VertxQueryExecutionContext implements QueryExecutionContext,
   VertxContext context;
   DataFetchingEnvironment environment;
   Set<Argument> arguments;
-  Promise<Object> fut;
+  Promise<Object> future; // basically Vert.x completableFuture
+  Optional<Counter> queryCounter;
 
   @Override
   public CompletableFuture runQuery(GraphQLEngineBuilder server, ResolvedJdbcQuery pgQuery,
@@ -66,10 +68,10 @@ public class VertxQueryExecutionContext implements QueryExecutionContext,
     // map the resultSet to json for GraphQL response
     future
         .map(r -> resultMapper(r, isList))
-        .onSuccess(fut::complete)
+        .onSuccess(result -> {queryCounter.ifPresent(Counter::increment); this.future.complete(result);})
         .onFailure(f -> {
           f.printStackTrace();
-          fut.fail(f);
+          this.future.fail(f);
         });
     return new CompletableFuture();
   }
@@ -95,10 +97,10 @@ public class VertxQueryExecutionContext implements QueryExecutionContext,
 
     future
       .map(r -> resultMapper(r, isList))
-      .onSuccess(fut::complete)
+      .onSuccess(result -> {queryCounter.ifPresent(Counter::increment); this.future.complete(result);})
       .onFailure(f -> {
         f.printStackTrace();
-        fut.fail(f);
+        this.future.fail(f);
       });
 
     return new CompletableFuture();

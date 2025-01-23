@@ -20,8 +20,11 @@ import com.google.common.base.Preconditions;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.PropertyDataFetcher;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.handler.graphql.schema.VertxDataFetcher;
+import io.vertx.micrometer.backends.BackendRegistries;
 import io.vertx.sqlclient.PreparedQuery;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
@@ -32,6 +35,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -88,7 +92,7 @@ public class VertxContext implements Context {
 
   @Override
   public DataFetcher<?> createArgumentLookupFetcher(GraphQLEngineBuilder server, Map<Set<Argument>, ResolvedQuery> lookupMap) {
-    return VertxDataFetcher.create((env, fut) -> {
+    return VertxDataFetcher.create((env, future) -> {
       //Map args
       Set<Argument> argumentSet = env.getArguments().entrySet().stream()
           .map(argument -> new VariableArgument(argument.getKey(), argument.getValue()))
@@ -97,12 +101,20 @@ public class VertxContext implements Context {
       //Find query
       ResolvedQuery resolvedQuery = lookupMap.get(argumentSet);
       if (resolvedQuery == null) {
-        fut.fail("Could not find query: " + env.getArguments());
+        future.fail("Could not find query: " + env.getArguments());
         return;
       }
       //Execute
+      final MeterRegistry meterRegistry = BackendRegistries.getDefaultNow();
+      Optional<Counter> counter = Optional.empty();
+      if (meterRegistry != null) {
+        counter = Optional.of(Counter.builder("graphql.query" + argumentSet + ".count")
+                .description("Number of GraphQL queries executed for query " + argumentSet)
+                .register(meterRegistry));
+      }
+
       QueryExecutionContext context = new VertxQueryExecutionContext(this,
-          env, argumentSet, fut);
+          env, argumentSet, future, counter);
       resolvedQuery.accept(server, context);
     });
   }

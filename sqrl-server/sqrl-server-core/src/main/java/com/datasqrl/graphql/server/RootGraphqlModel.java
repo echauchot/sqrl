@@ -225,6 +225,11 @@ public class RootGraphqlModel {
     R visitFieldLookup(FieldLookupCoords coords, C context);
   }
 
+  /**
+   *  Binds graphql queries with corresponding sql queries and the combinations of their arguments:
+   *  out of graphQL schema we generate all possible SQL queries for the possible arguments. (nullable, not nullable, same table called with different sets of args).
+   *  These combinations are matchs which contain arguments, sql query and parameters.
+   */
   @Getter
   @AllArgsConstructor
   @NoArgsConstructor
