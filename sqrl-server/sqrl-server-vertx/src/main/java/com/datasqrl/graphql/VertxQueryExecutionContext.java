@@ -34,12 +34,14 @@ import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Responsible for executing the resolved SQL queries (paginated or not) in Vert.x and mapping the database resultSet to json for using in GraphQL responses.
- * It also implements the parameters and arguments visitors for the {@link com.datasqrl.graphql.server.RootGraphqlModel} visitors
+ * It is the ExecutionContext per servlet type. It is responsible for executing the resolved SQL
+ * queries (paginated or not) in Vert.x and mapping the database resultSet to json for using in
+ * GraphQL responses. It also implements the parameters and arguments visitors for the {@link
+ * com.datasqrl.graphql.server.RootGraphqlModel} visitors
  */
 @Value
-public class VertxQueryExecutionContext implements QueryExecutionContext,
-    ParameterHandlerVisitor<Object, QueryExecutionContext> {
+public class VertxQueryExecutionContext
+    implements QueryExecutionContext, ParameterHandlerVisitor<Object, QueryExecutionContext> {
   VertxContext context;
   DataFetchingEnvironment environment;
   Set<Argument> arguments;
