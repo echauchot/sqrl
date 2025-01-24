@@ -22,10 +22,15 @@ import lombok.Singular;
 import lombok.ToString;
 
 /**
- * Purpose: Encapsulates the GraphQL schema and entry points (queries, mutations, subscriptions).
+ * Purpose: Encapsulates the GraphQL schema and entry points (queries, mutations, subscriptions). Defines the visitor interfaces to visit the model.
  * This class is deserialized from vertx.json
- * Collaboration: Provides visitors to process entry points and schema definitions.
- *
+ * <br/>
+ * Collaboration:
+ * <ul>
+ * <li> the root of the model, the schema, coords, the jdbc queries, the arguments and parameters are visited by {@link GraphQLEngineBuilder}
+ * <li> the mutations (kafka and prostgreSQL) are visited by {@link com.datasqrl.graphql.MutationConfigurationImpl}
+ * <li> the subscriptions (kafka and prostgreSQL) are visited by {@link com.datasqrl.graphql.SubscriptionConfigurationImpl}
+ * </ul>
  */
 @Getter
 @Builder

@@ -31,8 +31,12 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Purpose: Configures data fetchers for GraphQL subscriptions.
- * Collaboration: Uses {@link RootGraphqlModel} to get subscription coordinates and creates data fetchers for Kafka and PostgreSQL.
+ * Purpose: Configures {@link DataFetcher}s for GraphQL subscriptions the subscriptions (kafka
+ * messages subscription and postgreSQL listen/notify mechanism) that embed the code for executing the subscriptions.
+ *
+ * Collaboration:
+ * Uses {@link RootGraphqlModel} to get subscription coordinates and create data fetchers for Kafka and
+ * PostgreSQL.
  */
 @Slf4j
 @AllArgsConstructor

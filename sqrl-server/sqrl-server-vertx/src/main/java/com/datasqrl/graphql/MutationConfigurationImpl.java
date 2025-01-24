@@ -38,7 +38,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Purpose: Configures data fetchers for GraphQL mutations.
+ * Purpose: Configures data fetchers for GraphQL mutations and executes the mutations (kafka messages sending and SQL inserting)
  * Collaboration: Uses {@link RootGraphqlModel} to get mutation coordinates and creates data fetchers for Kafka and PostgreSQL.
  */
 @Slf4j
