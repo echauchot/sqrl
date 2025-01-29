@@ -111,11 +111,6 @@ public class GraphqlSchemaFactory {
     for (Map.Entry<NamePath, List<SqrlTableMacro>> field : fieldPathToTables.entrySet()) {
       if (field.getKey().getLast().isHidden()) continue; // hidden field not exposed in graphQL queries
 
-//      if (goal == ExecutionGoal.TEST) {
-//        if (!path.getValue().get(0).isTest()) continue;
-//      } else {
-//        if (path.getValue().get(0).isTest()) continue;
-//      }
       Optional<GraphQLObjectType> graphQLObjectType = generateObject(field.getValue(), // list of table functions de field is in
           objectPathToTables.getOrDefault(field.getKey(), List.of())); // List of table functions relationships
       graphQLObjectType.map(objectTypes::add);
@@ -131,20 +126,20 @@ public class GraphqlSchemaFactory {
     }
 
 
-    GraphQLSchema.Builder builder = GraphQLSchema.newSchema()
+    GraphQLSchema.Builder graphQLSchemaBuilder = GraphQLSchema.newSchema()
         .query(queryType);
     if (extendedScalarTypes) { // use the plural parameter name in place of only bigInteger to avoid having a conf parameter of each special type mapping feature in the future
-      builder.additionalTypes(Set.of(CustomScalars.GRAPHQL_BIGINTEGER));
+        graphQLSchemaBuilder.additionalTypes(Set.of(CustomScalars.GRAPHQL_BIGINTEGER));
     }
     if (goal != ExecutionGoal.TEST) {
       if (logManager.hasLogEngine() && System.getenv().get("ENABLE_SUBSCRIPTIONS") != null) {
         Optional<GraphQLObjectType.Builder> subscriptions = createSubscriptionTypes(schema);
-        subscriptions.map(builder::subscription);
+        subscriptions.map(graphQLSchemaBuilder::subscription);
       }
       Optional<GraphQLObjectType.Builder> mutations = createMutationTypes(schema);
-      mutations.map(builder::mutation);
+      mutations.map(graphQLSchemaBuilder::mutation);
     }
-    builder.additionalTypes(new LinkedHashSet<>(objectTypes)); // the inferred types
+      graphQLSchemaBuilder.additionalTypes(new LinkedHashSet<>(objectTypes)); // the inferred types
 
     if (queryType.getFields().isEmpty()) {
       if (goal == ExecutionGoal.TEST) {
@@ -153,18 +148,7 @@ public class GraphqlSchemaFactory {
         throw new RuntimeException("No queryable tables found for server");
       }
     }
-
-    //todo: hack because we can't merge scalars with graphql-java
-    if (goal != ExecutionGoal.TEST) {
-      builder
-        .additionalType(CustomScalars.DATETIME)
-        .additionalType(CustomScalars.DATE)
-        .additionalType(CustomScalars.TIME)
-        .additionalType(CustomScalars.JSON)
-      ;
-    }
-
-    return Optional.of(builder.build());
+    return Optional.of(graphQLSchemaBuilder.build());
   }
 
   private Optional<Builder> createMutationTypes(SqrlSchema schema) {

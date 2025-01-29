@@ -15,14 +15,13 @@ import com.datasqrl.loaders.ModuleLoader;
 import com.datasqrl.loaders.ModuleLoaderComposite;
 import com.datasqrl.plan.MainScript;
 import com.datasqrl.plan.global.DAGPlanner;
-import com.datasqrl.plan.global.LogicalDAGPlan;
 import com.datasqrl.plan.global.PhysicalDAGPlan;
 import com.datasqrl.plan.global.SqrlDAG;
 import com.datasqrl.plan.queries.APISource;
 import com.datasqrl.plan.validate.ExecutionGoal;
 import com.datasqrl.plan.validate.ScriptPlanner;
 import com.google.inject.Inject;
-import java.nio.file.Files;
+
 import java.nio.file.Path;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
@@ -50,22 +49,25 @@ public class CompilationProcess {
   private final MainScript mainScript;
   private final PhysicalPlanner physicalPlanner; // 5. PHYSICAL PLANNER: match preliminary physical plan (step 4) stages to configured engines to generate the physical plan
                                                 // that bookkeeps everything needed for the engine environment (topics for kafka, tablespace for postGre, flinkSQL compiled plan, ...)
+  //TODO 2. merge with graphQL schema inference
   private final GraphqlPostplanHook graphqlPostplanHook; // 6. PHYSICAL PLANNER: walks the GraphQL schema to create the graphQL model - which encapsulates the GraphQL schema and entry points (queries, mutations, subscriptions) - using the physical plan and the database queries
   private final CreateDatabaseQueries createDatabaseQueries; // 1.4. TRANSPILER: Based on the logicalPlan (calcite schema) keep track of the APIQueries (wrapper that links together database query parameters, graphQL query and corresponding Calcite relNode in the logical plan) for the table functions.
                                                             // This is useful to be able to expose data through DataBase requests and/or GraphQL requests.
-  private final InferGraphqlSchema inferencePostcompileHook; // 1.5. TRANSPILER: generate the GraphQL schema from the logicalPlan if the user has not provided one.
+
+  //TODO 1. move to post physical plan
+  private final InferGraphqlSchema inferGraphqlSchema; // 1.5. TRANSPILER: generate the GraphQL schema from the logicalPlan if the user has not provided one.
                                                             // Validate the schema and walk it to create APIQueries for managing graphQL endpoints (queries, mutations, subscriptions)
   private final WriteDag writeDeploymentArtifactsHook; // 7. PACKAGER: generate DAG artifacts and write them to the build dir
-//  private final FlinkSqlGenerator flinkSqlGenerator;
   private final GraphqlSourceFactory graphqlSourceFactory;
   private final ExecutionGoal executionGoal;
+  //TODO 3. merge with graphQL schema inference
   private final GraphQLMutationExtraction graphQLMutationExtraction; //1.1 TRANSPILER: If the user provided a GraphQL schema, extract the mutations defined in the schema as APISource (so that all GraphQL endpoints are APISources)
   private final ExecutionPipeline pipeline; // handle execution stages
   private final TestPlanner testPlanner;
 
   public Pair<PhysicalPlan, TestPlan> executeCompilation(Optional<Path> testsPath) {
     pipeline.getStage(Type.SERVER)
-        .flatMap(p->graphqlSourceFactory.get())
+        .flatMap(p->graphqlSourceFactory.getUserProvidedSchema())
         .ifPresent(graphQLMutationExtraction::analyze);
 
     ModuleLoader composite = ModuleLoaderComposite.builder()
@@ -74,8 +76,8 @@ public class CompilationProcess {
         .build();
 
     planner.plan(mainScript, composite);
-    postcompileHooks();
-    Optional<APISource> source = inferencePostcompileHook.run(testsPath);
+    createDatabaseQueries.run();
+    Optional<APISource> source = inferGraphqlSchema.run();
     SqrlDAG dag = dagPlanner.planLogical();
     PhysicalDAGPlan dagPlan = dagPlanner.planPhysical(dag);
 
@@ -93,7 +95,4 @@ public class CompilationProcess {
     return Pair.of(physicalPlan, testPlan);
   }
 
-  private void postcompileHooks() {
-    createDatabaseQueries.run();
-  }
 }

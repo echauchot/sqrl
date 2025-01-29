@@ -9,16 +9,16 @@ import com.google.inject.Inject;
 import java.util.Optional;
 
 public class GraphqlSourceFactory {
-  Optional<APISource> apiSchemaOpt;
+  Optional<APISource> apiSource;
 
   @Inject
   public GraphqlSourceFactory(ScriptFiles scriptFiles, NameCanonicalizer nameCanonicalizer,
       ResourceResolver resourceResolver) {
-    apiSchemaOpt = scriptFiles.getConfig().getGraphql()
+    apiSource = scriptFiles.getConfig().getGraphql()
         .map(file -> APISourceImpl.of(file, nameCanonicalizer, resourceResolver));
   }
 
-  public Optional<APISource> get() {
-    return apiSchemaOpt;
+  public Optional<APISource> getUserProvidedSchema() {
+    return apiSource;
   }
 }
