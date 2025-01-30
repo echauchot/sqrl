@@ -27,8 +27,17 @@ import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 
+/**
+ * Mutations need to be extracted at the beginning of the compilation because we need to convert
+ * them into sources for the SQRL script to plan: if we define a mutation with two field a and b and
+ * then define a table in SQRL <b> Table := SELECT a FROM MyMutation </b> we need to know what the
+ * schema of MyMutation is to correctly plan the SELECT query and create the MyMutation source.
+ * Hence, this needs to happen before. For queries and subscriptions, those are not needed until
+ * afterward because they follow what is defined in the SQRL script. In other words defining a
+ * subscription or a query on SQRL table does not change the plan.
+ */
 @Slf4j
-@AllArgsConstructor(onConstructor_=@Inject)
+@AllArgsConstructor(onConstructor_ = @Inject)
 @Getter
 public class GraphQLMutationExtraction {
   private final GraphqlSchemaParser schemaParser;
