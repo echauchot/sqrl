@@ -88,6 +88,7 @@ public abstract class SchemaWalker {
     }
   }
 
+ //ECH
   private void walk(ObjectTypeDefinition type, FieldDefinition field, NamePath path,
       Optional<RelDataType> rel, TypeDefinitionRegistry registry) {
     //1. Check to see if we have a table function or a reldatatype of this field.

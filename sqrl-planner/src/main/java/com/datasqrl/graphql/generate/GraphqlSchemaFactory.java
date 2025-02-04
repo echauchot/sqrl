@@ -19,17 +19,14 @@ import com.datasqrl.canonicalizer.Name;
 import com.datasqrl.canonicalizer.NamePath;
 
 import com.datasqrl.config.PackageJson.CompilerConfig;
-import com.datasqrl.config.SystemBuiltInConnectors;
 import com.datasqrl.engine.log.LogManager;
 import com.datasqrl.function.SqrlFunctionParameter;
 import com.datasqrl.graphql.server.CustomScalars;
 import com.datasqrl.io.tables.TableType;
 import com.datasqrl.plan.table.PhysicalRelationalTable;
 import com.datasqrl.plan.table.ProxyImportRelationalTable;
-import com.datasqrl.plan.table.QueryRelationalTable;
 import com.datasqrl.plan.validate.ExecutionGoal;
 import com.datasqrl.plan.validate.ResolvedImport;
-import com.datasqrl.plan.validate.ScriptPlanner.Mutation;
 import com.datasqrl.schema.Multiplicity;
 import com.datasqrl.schema.NestedRelationship;
 import com.datasqrl.schema.Relationship.JoinType;
@@ -37,7 +34,6 @@ import com.datasqrl.schema.RootSqrlTable;
 import com.google.inject.Inject;
 import graphql.Scalars;
 import graphql.language.IntValue;
-import graphql.scalars.ExtendedScalars;
 import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputType;
@@ -68,7 +64,6 @@ import org.apache.calcite.schema.FunctionParameter;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.apache.commons.collections.ListUtils;
-import scala.annotation.meta.field;
 
 /**
  * Creates a default graphql schema based on the SQRL schema
@@ -84,9 +79,9 @@ public class GraphqlSchemaFactory {
   private final boolean extendedScalarTypes;
   private final LogManager logManager;
   // Root path signifying the 'Query' type.
-  private Map<NamePath, List<SqrlTableMacro>> objectPathToTables;
+  private Map<NamePath, List<SqrlTableMacro>> parentToTableFunctions;
   // The path from root
-  private Map<NamePath, List<SqrlTableMacro>> fieldPathToTables;
+  private Map<NamePath, List<SqrlTableMacro>> absolutePathToTableFunctions;
   public final Set<String> seen = new HashSet<>();
 
   @Inject
@@ -102,21 +97,24 @@ public class GraphqlSchemaFactory {
   }
 
   public Optional<GraphQLSchema> generate(ExecutionGoal goal) {
-    this.objectPathToTables = schema.getTableFunctions().stream()
+    // group table functions by their parent path
+    this.parentToTableFunctions = schema.getTableFunctions().stream()
         .collect(Collectors.groupingBy(e -> e.getFullPath().popLast(),
             LinkedHashMap::new, Collectors.toList()));
-    this.fieldPathToTables = schema.getTableFunctions().stream()
+    // group table functions by their absolute path
+    this.absolutePathToTableFunctions = schema.getTableFunctions().stream()
         .collect(Collectors.groupingBy(SqrlTableMacro::getAbsolutePath,
             LinkedHashMap::new, Collectors.toList()));
-    for (Map.Entry<NamePath, List<SqrlTableMacro>> field : fieldPathToTables.entrySet()) {
-      if (field.getKey().getLast().isHidden()) continue; // hidden field not exposed in graphQL queries
 
-      Optional<GraphQLObjectType> graphQLObjectType = generateObject(field.getValue(), // list of table functions de field is in
-          objectPathToTables.getOrDefault(field.getKey(), List.of())); // List of table functions relationships
+    for (Map.Entry<NamePath, List<SqrlTableMacro>> path : absolutePathToTableFunctions.entrySet()) {
+      if (path.getKey().getLast().isHidden()) continue; // filter out the hidden table functions
+
+      Optional<GraphQLObjectType> graphQLObjectType = generateObject(path.getValue(), // list of table functions with the same path
+          parentToTableFunctions.getOrDefault(path.getKey(), List.of())); // List of table functions parents of this path
       graphQLObjectType.map(objectTypes::add);
     }
 
-    GraphQLObjectType queryType = createQueryType(goal, objectPathToTables.get(NamePath.ROOT));
+    GraphQLObjectType queryType = createQueryType(goal, parentToTableFunctions.get(NamePath.ROOT));
 
     // cleaning of invalid objectTypes
     postProcess();
@@ -133,13 +131,13 @@ public class GraphqlSchemaFactory {
     }
     if (goal != ExecutionGoal.TEST) {
       if (logManager.hasLogEngine() && System.getenv().get("ENABLE_SUBSCRIPTIONS") != null) {
-        Optional<GraphQLObjectType.Builder> subscriptions = createSubscriptionTypes(schema);
+        Optional<GraphQLObjectType.Builder> subscriptions = createSubscriptionTypes();
         subscriptions.map(graphQLSchemaBuilder::subscription);
       }
-      Optional<GraphQLObjectType.Builder> mutations = createMutationTypes(schema);
+      Optional<GraphQLObjectType.Builder> mutations = createMutationTypes();
       mutations.map(graphQLSchemaBuilder::mutation);
     }
-      graphQLSchemaBuilder.additionalTypes(new LinkedHashSet<>(objectTypes)); // the inferred types
+      graphQLSchemaBuilder.additionalTypes(new LinkedHashSet<>(objectTypes)); // the inferred types cleaned
 
     if (queryType.getFields().isEmpty()) {
       if (goal == ExecutionGoal.TEST) {
@@ -151,7 +149,7 @@ public class GraphqlSchemaFactory {
     return Optional.of(graphQLSchemaBuilder.build());
   }
 
-  private Optional<Builder> createMutationTypes(SqrlSchema schema) {
+  private Optional<Builder> createMutationTypes() {
     Builder builder = GraphQLObjectType.newObject().name("Mutation");
 
     if (schema.getImports().isEmpty()) {
@@ -173,18 +171,18 @@ public class GraphqlSchemaFactory {
           .type(inputType)
           .build();
 
-      GraphQLFieldDefinition subscriptionField = GraphQLFieldDefinition.newFieldDefinition()
+      GraphQLFieldDefinition mutationField = GraphQLFieldDefinition.newFieldDefinition()
           .name(name)
           .argument(inputArgument)
           .type(createOutputTypeForRelDataType(type, NamePath.of(name), seen, extendedScalarTypes).get())
           .build();
 
-      builder.field(subscriptionField);
+      builder.field(mutationField);
     }
     return Optional.of(builder);
   }
 
-  public Optional<Builder> createSubscriptionTypes(SqrlSchema schema) {
+  public Optional<Builder> createSubscriptionTypes() {
     Builder subscriptionBuilder = GraphQLObjectType.newObject().name("Subscription");
 
     // Retrieve streamable tables from the schema
@@ -233,24 +231,24 @@ public class GraphqlSchemaFactory {
   }
 
 
-  private GraphQLObjectType createQueryType(ExecutionGoal goal, List<SqrlTableMacro> relationships) {
+  private GraphQLObjectType createQueryType(ExecutionGoal goal, List<SqrlTableMacro> rootTables) {
 
     List<GraphQLFieldDefinition> fields = new ArrayList<>();
 
-    for (SqrlTableMacro rel : relationships) {
-      String name = rel.getAbsolutePath().getDisplay();
+    for (SqrlTableMacro rootTable : rootTables) {
+      String name = rootTable.getAbsolutePath().getDisplay();
       if (name.startsWith(HIDDEN_PREFIX) || !isValidGraphQLName(name)) continue;
 
       if (goal == ExecutionGoal.TEST) {
-        if (!rel.isTest()) continue;
+        if (!rootTable.isTest()) continue;
       } else {
-        if (rel.isTest()) continue;
+        if (rootTable.isTest()) continue;
       }
 
       GraphQLFieldDefinition field = GraphQLFieldDefinition.newFieldDefinition()
-          .name(rel.getAbsolutePath().getDisplay())
-          .type(wrap(createTypeName(rel), rel.getMultiplicity()))
-          .arguments(createArguments(rel))
+          .name(rootTable.getAbsolutePath().getDisplay())
+          .type(wrap(createTypeName(rootTable), rootTable.getMultiplicity()))
+          .arguments(createArguments(rootTable))
           .build();
       fields.add(field);
     }
@@ -267,29 +265,31 @@ public class GraphqlSchemaFactory {
     return objectType;
   }
 
-  private Optional<GraphQLObjectType> generateObject(List<SqrlTableMacro> tableMacros, List<SqrlTableMacro> relationships) {
+  private Optional<GraphQLObjectType> generateObject(List<SqrlTableMacro> tableFunctionsWithSamePath, List<SqrlTableMacro> theirParentTableFunctions) {
     //Todo check: The multiple table macros should all point to the same relnode type
 
-    Map<Name, List<SqrlTableMacro>> relByName = relationships.stream()
-        .collect(Collectors.groupingBy(g -> g.getFullPath().getLast(), //map from relationship field to list of table functions
+    Map<Name, List<SqrlTableMacro>> parentsByName = theirParentTableFunctions.stream()
+        .collect(Collectors.groupingBy(g -> g.getFullPath().getLast(),
             LinkedHashMap::new, Collectors.toList()));
 
-    SqrlTableMacro first = tableMacros.get(0); // take the first table function the field is in
-    RelDataType rowType = first.getRowType(); // and extract its calcite schema.
+    // all the talble functions with same path should have same schema, extract first calcite schema
+    SqrlTableMacro first = tableFunctionsWithSamePath.get(0);
+    RelDataType rowType = first.getRowType();
+
     //todo: check that all table macros are compatible
-//    for (int i = 1; i < tableMacros.size(); i++) {
+//    for (int i = 1; i < tableFunctionsWithSamePath.size(); i++) {
 //    }
 
     // create the graphQL fields for non-relationship fields
     List<GraphQLFieldDefinition> fields = new ArrayList<>();
     for (RelDataTypeField field : rowType.getFieldList()) {
-      if (!relByName.containsKey(Name.system(field.getName()))) {
+      if (!parentsByName.containsKey(Name.system(field.getName()))) {
         createRelationshipField(field).map(fields::add);
       }
     }
     // create the graphQL fields for relationship fields
-    for (Map.Entry<Name, List<SqrlTableMacro>> rel : relByName.entrySet()) {
-      createRelationshipField(rel.getValue()).map(fields::add);
+    for (Map.Entry<Name, List<SqrlTableMacro>> name : parentsByName.entrySet()) {
+      createRelationshipField(name.getValue()).map(fields::add);
     }
 
     if (fields.isEmpty()) {
@@ -321,8 +321,8 @@ public class GraphqlSchemaFactory {
     return uniquifyName(path.getLast().getDisplay());
   }
 
-  private Optional<GraphQLFieldDefinition> createRelationshipField(List<SqrlTableMacro> value) {
-    SqrlTableMacro sqrlTableMacro = value.get(0);
+  private Optional<GraphQLFieldDefinition> createRelationshipField(List<SqrlTableMacro> tableFunctionsWithSameParent) {
+    SqrlTableMacro sqrlTableMacro = tableFunctionsWithSameParent.get(0); // parents with the same name, first one
     String name = sqrlTableMacro.getFullPath().getLast().getDisplay();
     if (!isValidGraphQLName(name) || isHiddenString(name)) {
       return Optional.empty();
@@ -351,7 +351,7 @@ public class GraphqlSchemaFactory {
     } else if (addArguments && parameters.isEmpty()) {
       NamePath toTable = schema.getPathToAbsolutePathMap()
           .get(field.getFullPath());
-      List<SqrlTableMacro> sqrlTableMacros = fieldPathToTables.get(toTable);
+      List<SqrlTableMacro> sqrlTableMacros = absolutePathToTableFunctions.get(toTable);
       List<GraphQLArgument> premuted = generatePermuted(sqrlTableMacros.get(0));
       List<GraphQLArgument> limitOffset = generateLimitOffset();
 

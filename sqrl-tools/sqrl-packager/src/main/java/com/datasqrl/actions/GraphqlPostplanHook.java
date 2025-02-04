@@ -14,6 +14,9 @@ import com.google.inject.Inject;
 import java.util.Optional;
 import lombok.AllArgsConstructor;
 
+/**
+ * Wals the {@link APISource} to create {@link RootGraphqlModel} with all the {@link com.datasqrl.graphql.server.RootGraphqlModel.Coords} for graphQL entrypoints.
+ */
 @AllArgsConstructor(onConstructor_ = @Inject)
 public class GraphqlPostplanHook {
 

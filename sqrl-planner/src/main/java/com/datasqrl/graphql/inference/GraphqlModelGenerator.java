@@ -226,6 +226,10 @@ public class GraphqlModelGenerator extends SchemaWalker {
 
   }
 
+  /**
+   *
+   * for all the APIQueries, convert the query string to the proper dialect based on the engine and then create the JdbcQuery paginated or not based on the limit.
+   */
   @Override
   protected void visitQuery(ObjectTypeDefinition parentType, ObjectTypeDefinition toType,
       FieldDefinition field, NamePath path, Optional<RelDataType> parentRel,
