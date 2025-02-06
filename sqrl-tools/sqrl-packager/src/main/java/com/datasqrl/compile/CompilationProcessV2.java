@@ -10,6 +10,7 @@ import com.datasqrl.engine.EnginePhysicalPlan;
 import com.datasqrl.engine.PhysicalPlan;
 import com.datasqrl.engine.PhysicalPlanner;
 import com.datasqrl.engine.pipeline.ExecutionPipeline;
+import com.datasqrl.plan.queries.APISource;
 import com.datasqrl.v2.dag.DAGBuilder;
 import com.datasqrl.v2.dag.DAGPlanner;
 import com.datasqrl.v2.dag.PipelineDAG;
@@ -20,10 +21,15 @@ import com.datasqrl.graphql.inference.GraphQLMutationExtraction;
 import com.datasqrl.loaders.ModuleLoader;
 import com.datasqrl.plan.MainScript;
 import com.datasqrl.plan.validate.ExecutionGoal;
+import com.datasqrl.v2.dag.plan.ServerStagePlan;
+import com.datasqrl.v2.graphql.generate.GraphqlSchemaFactory2;
 import com.google.inject.Inject;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import graphql.schema.GraphQLSchema;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -39,7 +45,7 @@ public class CompilationProcessV2 {
   private final PhysicalPlanner physicalPlanner;
   private final GraphqlPostplanHook graphqlPostplanHook;
   private final CreateDatabaseQueries createDatabaseQueries;
-  private final InferGraphqlSchema inferencePostcompileHook;
+  private final InferGraphqlSchema inferGraphqlSchema;
   private final WriteDag writeDeploymentArtifactsHook;
   //  private final FlinkSqlGenerator flinkSqlGenerator;
   private final GraphqlSourceFactory graphqlSourceFactory;
@@ -47,6 +53,7 @@ public class CompilationProcessV2 {
   private final GraphQLMutationExtraction graphQLMutationExtraction;
   private final ExecutionPipeline pipeline;
   private final TestPlanner testPlanner;
+  private final GraphqlSchemaFactory2 graphqlSchemaFactory;
 
   public Pair<PhysicalPlan, TestPlan> executeCompilation(Optional<Path> testsPath) {
 
@@ -55,7 +62,16 @@ public class CompilationProcessV2 {
     DAGBuilder dagBuilder = planner.getDagBuilder();
     PipelineDAG dag = dagPlanner.optimize(dagBuilder.getDag());
 //    System.out.println(dag);
+
+    //TODO merge my work on dealing with user schema
     List<EnginePhysicalPlan> plans = dagPlanner.assemble(dag, environment);
+    final ServerStagePlan serverStagePlan =
+        (ServerStagePlan)
+            plans.stream()
+                .filter(plan -> plan instanceof ServerStagePlan)
+                .collect(Collectors.toList())
+                .get(0); // there is only one server plan
+    final Optional<GraphQLSchema> graphQLSchema = graphqlSchemaFactory.generate(executionGoal, serverStagePlan);
 
 
     return null;
