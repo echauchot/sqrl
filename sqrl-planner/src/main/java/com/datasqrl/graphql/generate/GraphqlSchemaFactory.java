@@ -9,7 +9,7 @@ import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.createOutputTypeFo
 import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.getInputType;
 import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.getOutputType;
 import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.isValidGraphQLName;
-import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.wrap;
+import static com.datasqrl.graphql.generate.GraphqlSchemaUtil.wrapMultiplicity;
 import static com.datasqrl.graphql.jdbc.SchemaConstants.LIMIT;
 import static com.datasqrl.graphql.jdbc.SchemaConstants.OFFSET;
 import static graphql.schema.GraphQLNonNull.nonNull;
@@ -247,7 +247,7 @@ public class GraphqlSchemaFactory {
 
       GraphQLFieldDefinition field = GraphQLFieldDefinition.newFieldDefinition()
           .name(rootTable.getAbsolutePath().getDisplay())
-          .type(wrap(createTypeName(rootTable), rootTable.getMultiplicity()))
+          .type(wrapMultiplicity(createTypeName(rootTable), rootTable.getMultiplicity()))
           .arguments(createArguments(rootTable))
           .build();
       fields.add(field);
@@ -330,7 +330,7 @@ public class GraphqlSchemaFactory {
 
     GraphQLFieldDefinition field = GraphQLFieldDefinition.newFieldDefinition()
         .name(name)
-        .type(wrap(createTypeName(sqrlTableMacro), sqrlTableMacro.getMultiplicity()))
+        .type(wrapMultiplicity(createTypeName(sqrlTableMacro), sqrlTableMacro.getMultiplicity()))
         .arguments(createArguments(sqrlTableMacro))
         .build();
 
@@ -348,7 +348,7 @@ public class GraphqlSchemaFactory {
     if (addArguments && parameters.isEmpty() && field.getJoinType() == JoinType.JOIN) {
       List<GraphQLArgument> limitOffset = generateLimitOffset();
       return limitOffset;
-    } else if (addArguments && parameters.isEmpty()) {
+    } else if (addArguments && parameters.isEmpty()) { // not join
       NamePath toTable = schema.getPathToAbsolutePathMap()
           .get(field.getFullPath());
       List<SqrlTableMacro> sqrlTableMacros = absolutePathToTableFunctions.get(toTable);
@@ -356,7 +356,7 @@ public class GraphqlSchemaFactory {
       List<GraphQLArgument> limitOffset = generateLimitOffset();
 
       return ListUtils.union(premuted, limitOffset);
-    } else {
+    } else { // !addArguments ||  !parameters.isEmpty() || join
       return parameters.stream()
           .filter(p->!((SqrlFunctionParameter)p).isInternal())
           .filter(p->getInputType(p.getType(null), NamePath.of(p.getName()), seen, extendedScalarTypes).isPresent())
@@ -435,7 +435,7 @@ public class GraphqlSchemaFactory {
         .filter(f->isVisible(field))
         .map(t -> GraphQLFieldDefinition.newFieldDefinition()
             .name(field.getName())
-            .type(wrap(t, field.getType())).build());
+            .type(GraphqlSchemaUtil.wrapNullable(t, field.getType().isNullable())).build());
   }
 
   public void postProcess() {

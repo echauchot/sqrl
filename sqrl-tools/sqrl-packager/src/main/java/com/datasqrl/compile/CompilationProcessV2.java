@@ -63,7 +63,8 @@ public class CompilationProcessV2 {
     PipelineDAG dag = dagPlanner.optimize(dagBuilder.getDag());
 //    System.out.println(dag);
 
-    //TODO merge my work on dealing with user schema
+    //TODO merge my work on dealing with user schema and merge of schemas
+    // TODO merge with Matthias latest work.
     List<EnginePhysicalPlan> plans = dagPlanner.assemble(dag, environment);
     final ServerStagePlan serverStagePlan =
         (ServerStagePlan)

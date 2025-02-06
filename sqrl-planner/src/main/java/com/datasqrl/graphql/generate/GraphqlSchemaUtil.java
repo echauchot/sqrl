@@ -13,7 +13,6 @@ import com.datasqrl.json.FlinkJsonType;
 import com.datasqrl.schema.Multiplicity;
 import graphql.Scalars;
 import graphql.language.FieldDefinition;
-import graphql.scalars.ExtendedScalars;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLInputObjectField;
 import graphql.schema.GraphQLInputObjectType;
@@ -36,14 +35,14 @@ import org.apache.flink.table.planner.plan.schema.RawRelDataType;
 @Slf4j
 public class GraphqlSchemaUtil {
 
-  public static GraphQLOutputType wrap(GraphQLOutputType gqlType, RelDataType type) {
-    if (!type.isNullable()) {
+  public static GraphQLOutputType wrapNullable(GraphQLOutputType gqlType, boolean nullatble) {
+    if (!nullatble) {
       return GraphQLNonNull.nonNull(gqlType);
     }
     return gqlType;
   }
 
-  public static GraphQLOutputType wrap(GraphQLOutputType type, Multiplicity multiplicity) {
+  public static GraphQLOutputType wrapMultiplicity(GraphQLOutputType type, Multiplicity multiplicity) {
     switch (multiplicity) {
       case ZERO_ONE:
         return type;
@@ -144,7 +143,7 @@ public class GraphqlSchemaUtil {
           getOutputType(field.getType(), namePath.concat(Name.system(field.getName())), seen, extendedScalarTypes)
               .ifPresent(fieldType -> builder.field(GraphQLFieldDefinition.newFieldDefinition()
                   .name(field.getName())
-                  .type(wrap(fieldType, field.getType()))
+                  .type(wrapNullable(fieldType, field.getType().isNullable()))
                   .build()));
         }
         return Optional.of(builder.build());
