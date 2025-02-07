@@ -290,7 +290,7 @@ public class GraphqlSchemaFactory2 {
     List<GraphQLFieldDefinition> fields = new ArrayList<>();
     for (RelDataTypeField field : rowType.getFieldList()) {
       if (!nestedTableFunctionsUnderPathByField.containsKey(Name.system(field.getName()))) {
-        createSimpleGraphQlField(field).map(fields::add);
+          createSimpleGraphQlField(field).map(fields::add);
       }
     }
     // create the graphQL fields for relationship fields
@@ -327,6 +327,7 @@ public class GraphqlSchemaFactory2 {
     return uniquifyName(path.getLast().getDisplay());
   }
 
+  //TODO create a  method that takes either a relDataType or a table function. before everything was "casted" to a table function, now nested types are nested relDataTypes.
   private Optional<GraphQLFieldDefinition> createSimpleGraphQlField(RelDataTypeField field) {
     return getOutputType(field.getType(), NamePath.of(field.getName()), seen, extendedScalarTypes)
             .filter(type ->isValidGraphQLName(field.getName()))
@@ -438,6 +439,8 @@ public class GraphqlSchemaFactory2 {
     seen.add(tableFunctionName);
 
     return new GraphQLTypeReference(tableFunctionName);
+    //TODO if it is a table function: the type reference is the name of base table if exists because when the table function has a base table, its return type is the one of the base table. To avoid creating as many graphQl types as functions return types, we create a type for the base table when the base table exists otherwise we create a type with the name of the table function.
+    // if it is a reldatatype: the type name is the name of the field
   }
 
 
